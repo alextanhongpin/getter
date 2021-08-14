@@ -191,7 +191,7 @@ func generateGetter(f *jen.File, structName string, field StructField) {
 
 func generateSetter(f *jen.File, structName string, field StructField) {
 	// Output:
-	// func (e YourStruct) SetName(name string) {
+	// func (e *YourStruct) SetName(name string) {
 	// 	e.name = name
 	// }
 
