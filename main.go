@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"regexp"
 
 	"github.com/alextanhongpin/pkg/gen"
@@ -20,7 +21,9 @@ func init() {
 }
 
 func main() {
-	gen.New(generateStructFromFields)
+	if err := gen.New(generateStructFromFields); err != nil {
+		log.Fatalln(err)
+	}
 }
 
 func skipField(tag string) bool {
@@ -56,10 +59,6 @@ func generateGetter(f *jen.File, pkgPath, structName string, field gen.StructFie
 	// func (e YourStruct) Name() string {
 	// 	return e.name
 	// }
-	ptr := ""
-	if field.IsPointer {
-		ptr = "*"
-	}
 
 	shortName := gen.LowerFirst(structName)[:1]
 	f.Func().Params(
@@ -69,8 +68,25 @@ func generateGetter(f *jen.File, pkgPath, structName string, field gen.StructFie
 		// Name
 		gen.UpperCommonInitialism(field.Name),
 	).
-		Params().Op(ptr).
-		Qual(gen.SkipCurrentPackagePath(pkgPath, field), field.FieldType).Block(
-		Return(Id(shortName).Dot(field.Name)),
-	).Line()
+		Params().Parens(generateType(pkgPath, field)).
+		Block(
+			Return(Id(shortName).Dot(field.Name)),
+		).Line()
+}
+
+// Generate the field and type for primitive, map or collection.
+func generateType(pkgPath string, field gen.StructField) Code {
+	ptr := ""
+	if field.IsPointer {
+		ptr = "*"
+	}
+	param := Op(ptr)
+	if field.IsMap {
+		param = param.Map(Qual(gen.SkipCurrentPackagePath(pkgPath, field.MapKeyPkgPath), field.MapKeyType))
+	}
+	if field.IsCollection {
+		param = param.Index()
+	}
+	param = param.Qual(gen.SkipCurrentPackagePath(pkgPath, field.FieldPkgPath), field.FieldType)
+	return param
 }

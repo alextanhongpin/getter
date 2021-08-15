@@ -22,3 +22,23 @@ func (f Foo) Tags() []string {
 func (f Foo) Permission() *string {
 	return f.permission
 }
+
+func (f Foo) Ages() []Age {
+	return f.ages
+}
+
+func (f Foo) Nulls() []sql.NullInt64 {
+	return f.nulls
+}
+
+func (f Foo) ValidByAge() map[Age]bool {
+	return f.validByAge
+}
+
+func (f Foo) AgeByString() map[string]Age {
+	return f.ageByString
+}
+
+func (f Foo) AgesByString() map[string][]Age {
+	return f.agesByString
+}
