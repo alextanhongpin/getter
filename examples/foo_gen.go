@@ -3,42 +3,82 @@ package examples
 
 import "database/sql"
 
-func (f Foo) Name() string {
-	return f.name
+func (f Foo) Str() string {
+	return f.str
 }
 
-func (f Foo) RealAge() Age {
-	return f.realAge
+func (f Foo) I() int {
+	return f.i
 }
 
-func (f Foo) Hobby() sql.NullString {
-	return f.hobby
+func (f Foo) I32() int32 {
+	return f.i32
 }
 
-func (f Foo) Tags() []string {
-	return f.tags
+func (f Foo) I64() int64 {
+	return f.i64
 }
 
-func (f Foo) Permission() *string {
-	return f.permission
+func (f Foo) B() bool {
+	return f.b
 }
 
-func (f Foo) Ages() []Age {
-	return f.ages
+func (f Foo) SliceStr() []string {
+	return f.sliceStr
 }
 
-func (f Foo) Nulls() []sql.NullInt64 {
-	return f.nulls
+func (f Foo) SliceInt() []int {
+	return f.sliceInt
 }
 
-func (f Foo) ValidByAge() map[Age]bool {
-	return f.validByAge
+func (f Foo) SliceBool() []bool {
+	return f.sliceBool
 }
 
-func (f Foo) AgeByString() map[string]Age {
-	return f.ageByString
+func (f Foo) BoolsByString() map[string][]bool {
+	return f.boolsByString
 }
 
-func (f Foo) AgesByString() map[string][]Age {
-	return f.agesByString
+func (f Foo) BoolByString() map[string]bool {
+	return f.boolByString
+}
+
+func (f Foo) FooTypesByString() map[string][]FooType {
+	return f.fooTypesByString
+}
+
+func (f Foo) FooTypePtrsByString() map[string][]*FooType {
+	return f.fooTypePtrsByString
+}
+
+func (f Foo) StringByFooType() map[FooType]string {
+	return f.stringByFooType
+}
+
+func (f Foo) StringByPtrFooType() map[*FooType]string {
+	return f.stringByPtrFooType
+}
+
+func (f Foo) StrPtr() *string {
+	return f.strPtr
+}
+
+func (f Foo) IntPtr() *int {
+	return f.intPtr
+}
+
+func (f Foo) BoolPtr() *bool {
+	return f.boolPtr
+}
+
+func (f Foo) Imported() sql.NullString {
+	return f.imported
+}
+
+func (f Foo) AliasPtr() *FooType {
+	return f.aliasPtr
+}
+
+func (f Foo) Alias() FooType {
+	return f.alias
 }

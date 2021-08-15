@@ -68,25 +68,27 @@ func generateGetter(f *jen.File, pkgPath, structName string, field gen.StructFie
 		// Name
 		gen.UpperCommonInitialism(field.Name),
 	).
-		Params().Parens(generateType(pkgPath, field)).
+		Params().Add(generateType(pkgPath, field.Field)).
 		Block(
 			Return(Id(shortName).Dot(field.Name)),
 		).Line()
 }
 
 // Generate the field and type for primitive, map or collection.
-func generateType(pkgPath string, field gen.StructField) Code {
-	ptr := ""
-	if field.IsPointer {
-		ptr = "*"
-	}
-	param := Op(ptr)
+func generateType(pkgPath string, field *gen.Field) Code {
+	param := Op("")
 	if field.IsMap {
-		param = param.Map(Qual(gen.SkipCurrentPackagePath(pkgPath, field.MapKeyPkgPath), field.MapKeyType))
+		key, value := field.MapKey, field.MapValue
+		param = param.Map(generateType(pkgPath, key))
+		param = param.Add(generateType(pkgPath, value))
+		return param
 	}
 	if field.IsCollection {
 		param = param.Index()
 	}
-	param = param.Qual(gen.SkipCurrentPackagePath(pkgPath, field.FieldPkgPath), field.FieldType)
+	if field.IsPointer {
+		param = param.Add(Op("*"))
+	}
+	param = param.Qual(gen.SkipCurrentPackagePath(pkgPath, field.PkgPath), field.Type)
 	return param
 }
