@@ -7,8 +7,13 @@ func (f Foo) Name() string {
 	return f.name
 }
 
-func (f *Foo) SetExtra(extra string) {
+func (f Foo) RealAge() Age {
+	return f.realAge
+}
+
+func (f *Foo) SetExtra(extra string) *Foo {
 	f.Extra = extra
+	return f
 }
 
 func (f Foo) Hobby() sql.NullString {
@@ -23,6 +28,9 @@ func (f Foo) Permission() *string {
 	return f.permission
 }
 
-func (f *Foo) SetPermission(permission *string) {
-	f.permission = permission
+func (f *Foo) SetPermission(permission string, valid bool) *Foo {
+	if valid {
+		f.permission = &permission
+	}
+	return f
 }

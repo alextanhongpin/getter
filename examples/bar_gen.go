@@ -7,30 +7,34 @@ func (b Bar) ID() uuid.UUID {
 	return b.id
 }
 
-func (b *Bar) SetID(id uuid.UUID) {
+func (b *Bar) SetID(id uuid.UUID) *Bar {
 	b.id = id
+	return b
 }
 
 func (b Bar) Name() string {
 	return b.name
 }
 
-func (b *Bar) SetName(name string) {
+func (b *Bar) SetName(name string) *Bar {
 	b.name = name
+	return b
 }
 
 func (b Bar) Age() int64 {
 	return b.age
 }
 
-func (b *Bar) SetAge(age int64) {
+func (b *Bar) SetAge(age int64) *Bar {
 	b.age = age
+	return b
 }
 
 func (b Bar) URL() string {
 	return b.url
 }
 
-func (b *Bar) SetURL(url string) {
+func (b *Bar) SetURL(url string) *Bar {
 	b.url = url
+	return b
 }
