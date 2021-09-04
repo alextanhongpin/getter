@@ -2,7 +2,6 @@ package loader
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,7 +13,7 @@ import (
 func fullPath(rel string) string {
 	path, err := os.Getwd()
 	if err != nil {
-		log.Fatalf("failed to get package directory: %v", err)
+		panic(fmt.Errorf("failed to get package directory: %v", err))
 	}
 	path = filepath.Join(path, rel)
 	return path

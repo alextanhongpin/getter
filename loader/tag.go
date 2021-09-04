@@ -42,31 +42,39 @@ func NewTag(tag string) (*Tag, error) {
 	}
 
 	parts := strings.Split(match, ",")
-	var inlinePrefix string
+
+	name := parts[0]
+	if !IsFieldExported(name) {
+		return nil, fmt.Errorf("struct tag `%s` contains unexported field\nhint: rename %q to %q", tag, name, UpperCommonInitialism(name))
+	}
+
 	var inline bool
+	var inlinePrefix string
 	if len(parts) > 1 {
 		if parts[1] != "inline" {
-			return nil, fmt.Errorf("getter: invalid struct tag %q\nhint: use get:\"CustomName\" or get:\"CustomName,inline\" or get:\"-\"", tag)
+			return nil, fmt.Errorf("invalid struct tag %q\nhint: use get:\"CustomName\" or get:\"CustomName,inline\" or get:\"-\"", tag)
 		}
 		inline = true
+
 		if len(parts) > 2 {
 			inlinePrefix = parts[2]
-			initial, size := utf8.DecodeRuneInString(inlinePrefix)
-			if size != 0 {
-				if !unicode.IsUpper(initial) {
-					return nil, fmt.Errorf("getter: struct tag `%s` contains unexported field\nhint: rename %q to %q", tag, inlinePrefix, UpperCommonInitialism(inlinePrefix))
-				}
+			if !IsFieldExported(inlinePrefix) {
+				return nil, fmt.Errorf("struct tag `%s` contains unexported prefix field\nhint: rename %q to %q", tag, inlinePrefix, UpperCommonInitialism(inlinePrefix))
 			}
 		}
 	}
 
-	name := parts[0]
-	initial, size := utf8.DecodeRuneInString(name)
-	if size != 0 {
-		if !unicode.IsUpper(initial) {
-			return nil, fmt.Errorf("getter: struct tag `%s` contains unexported field\nhint: rename %q to %q", tag, name, UpperCommonInitialism(name))
-		}
+	return &Tag{Name: name, Inline: inline, InlinePrefix: inlinePrefix}, nil
+}
+
+func IsFieldExported(name string) bool {
+	c, size := utf8.DecodeRuneInString(name)
+
+	// Optional. True if string is empty.
+	if size == 0 {
+		return true
 	}
 
-	return &Tag{Name: name, Inline: inline, InlinePrefix: inlinePrefix}, nil
+	// If the string exists, it must be upper.
+	return size > 0 && unicode.IsUpper(c)
 }

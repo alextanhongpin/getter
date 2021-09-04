@@ -22,20 +22,16 @@ func trimExtension(path string) string {
 // e.g. path/to/github.com/your-repo/your-pkg returns github.com/your-repo/your-pkg
 // If your package is not hosted on github, you may need to override $PKG to
 // set the prefix of your package.
-func packagePath(path string) string {
+func packagePath(prefix, path string) string {
 	path = trimExtension(path)
 	path = strings.TrimRight(path, "/")
-	pkg := os.Getenv("PKG")
-	if pkg == "" {
-		pkg = "github.com"
-	}
-	idx := strings.Index(path, pkg)
+	idx := strings.Index(path, prefix)
 	return path[idx:]
 }
 
 // packageName returns the base package name.
-func packageName(path string) string {
-	return filepath.Base(packagePath(path))
+func packageName(prefix, path string) string {
+	return filepath.Base(packagePath(prefix, path))
 }
 
 func loadPackage(path string) *packages.Package {

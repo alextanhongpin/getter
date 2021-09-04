@@ -13,7 +13,6 @@ import (
 //  Name sql.NullString `json:"name"
 //}
 type StructField struct {
-	CustomName string `example:"CustomName"` // Defaults to name if no custom name is provided.
 	// Name of the struct field.
 	Name string `example:"Name"`
 
@@ -41,11 +40,10 @@ type Type struct {
 }
 
 // NewType recursively checks for the field type.
-func NewType(orityp types.Type) (*Type, error) {
+func NewType(orityp types.Type) *Type {
 	var isPointer, isCollection, isStruct, isMap bool
 	var fieldPkgPath, fieldType string
 	var mapKey, mapValue *Type
-	var err error
 	typ := orityp
 
 	switch t := typ.(type) {
@@ -57,15 +55,8 @@ func NewType(orityp types.Type) (*Type, error) {
 		typ = t.Elem()
 	case *types.Map:
 		isMap = true
-		var err error
-		mapKey, err = NewType(t.Key())
-		if err != nil {
-			return nil, err
-		}
-		mapValue, err = NewType(t.Elem())
-		if err != nil {
-			return nil, err
-		}
+		mapKey = NewType(t.Key())
+		mapValue = NewType(t.Elem())
 	}
 
 	// In case the slice or array is pointer, we take the elem again.
@@ -78,9 +69,6 @@ func NewType(orityp types.Type) (*Type, error) {
 	switch t := typ.(type) {
 	case *types.Struct:
 		isStruct = true
-		if err != nil {
-			return nil, err
-		}
 	case *types.Named:
 		obj := t.Obj()
 		fieldPkgPath = obj.Pkg().Path()
@@ -108,7 +96,7 @@ func NewType(orityp types.Type) (*Type, error) {
 		MapValue:     mapValue,
 		T:            orityp,
 		E:            typ,
-	}, nil
+	}
 }
 
 type Option struct {
@@ -124,41 +112,39 @@ type Option struct {
 type Generator func(opt Option) error
 
 func New(fn Generator) error {
-	structPtr := flag.String("type", "", "the target struct name")
 	inp := flag.String("in", os.Getenv("GOFILE"), "the input file, defaults to the file with the go:generate comment")
 	outp := flag.String("out", "", "the output directory")
+	pkgp := flag.String("pkg", "github.com", "the package or package prefix path")
 	prefixp := flag.String("prefix", "", "the generated field name prefix, e.g. Get")
+	structp := flag.String("type", "", "the target struct name")
 	flag.Parse()
 
 	in := fullPath(*inp)
-	pkg := loadPackage(packagePath(in)) // github.com/your-github-username/your-pkg.
-	pkgPath := pkg.PkgPath              // Specify the config packages.NeedName to get this value.
-	pkgName := pkg.Name                 // main
+	pkg := loadPackage(packagePath(*pkgp, in)) // github.com/your-github-username/your-pkg.
+	pkgPath := pkg.PkgPath                     // Specify the config packages.NeedName to get this value.
+	pkgName := pkg.Name                        // main
 
 	// Allows -type=Foo,Bar
-	structNames := strings.Split(*structPtr, ",")
+	structNames := strings.Split(*structp, ",")
 	for _, structName := range structNames {
 		out := FileNameFromTypeName(*inp, *outp, structName)
 		obj := pkg.Types.Scope().Lookup(structName)
 		if obj == nil {
-			panic(fmt.Errorf("loader: struct %s not found", structName))
+			return fmt.Errorf("loader: struct %s not found", structName)
 		}
 
 		// Check if it is a declared typed.
 		if _, ok := obj.(*types.TypeName); !ok {
-			panic(fmt.Errorf("loader: %v is not a named type", obj))
+			return fmt.Errorf("loader: %v is not a named type", obj)
 		}
 
 		// Check if the type is a struct.
 		structType, ok := obj.Type().Underlying().(*types.Struct)
 		if !ok {
-			panic(fmt.Errorf("loader: %v is not a struct", obj))
+			return fmt.Errorf("loader: %v is not a struct", obj)
 		}
 
-		t, err := NewType(structType)
-		if err != nil {
-			return err
-		}
+		t := NewType(structType)
 
 		if err := fn(Option{
 			PkgName:    pkgName,
@@ -194,19 +180,13 @@ func ExtractStructFields(structType *types.Struct) (map[string]StructField, erro
 			}
 		}
 
-		t, err := NewType(field.Type())
-		if err != nil {
-			return nil, err
-		}
-
 		fields[name] = StructField{
-			CustomName: name,
-			Name:       field.Name(),
-			PkgPath:    field.Pkg().Path(),
-			Exported:   field.Exported(),
-			Type:       t,
-			Tag:        tag,
-			Ordinal:    i,
+			Name:     field.Name(),
+			PkgPath:  field.Pkg().Path(),
+			Exported: field.Exported(),
+			Type:     NewType(field.Type()),
+			Tag:      tag,
+			Ordinal:  i,
 		}
 	}
 
