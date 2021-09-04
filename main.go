@@ -210,6 +210,9 @@ func (v *visitor) Visit(T types.Type) bool {
 		o := u.Obj()
 		p := o.Pkg()
 		v.code = v.code.Qual(p.Path(), o.Name())
+
+		// We are not interested in the underlying types.
+		return false
 	case *types.Slice:
 		v.code = v.code.Index()
 	default:

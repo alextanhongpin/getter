@@ -38,19 +38,19 @@ func Walk(visitor Visitor, T types.Type) bool {
 		return next
 	}
 
-	switch t := T.Underlying().(type) {
+	switch u := T.Underlying().(type) {
 	case *types.Named:
-		return Walk(visitor, t.Underlying())
+		return Walk(visitor, u.Underlying())
 	case *types.Pointer:
-		return Walk(visitor, t.Elem())
+		return Walk(visitor, u.Elem())
 	case *types.Array:
-		return Walk(visitor, t.Elem())
+		return Walk(visitor, u.Elem())
 	case *types.Slice:
-		return Walk(visitor, t.Elem())
+		return Walk(visitor, u.Elem())
 	case *types.Map:
-		return Walk(visitor, t.Elem())
+		return Walk(visitor, u.Elem())
 	default:
-		return types.IdenticalIgnoreTags(T, T.Underlying())
+		return types.IdenticalIgnoreTags(T, u)
 	}
 }
 
