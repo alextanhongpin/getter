@@ -45,13 +45,9 @@ func generateStructFromFields(opt loader.Option) error {
 	for _, fieldName := range fieldNames {
 		field := fields[fieldName]
 
-		fieldName, err = generateFieldName(prefix, fieldName)
+		fieldName, err = generateFieldNameWithPrefix(prefix, fieldName)
 		if err != nil {
 			return err
-		}
-
-		if namecache[fieldName] {
-			return fmt.Errorf("duplicate field name %q", fieldName)
 		}
 
 		if field.Tag != nil && field.Tag.Inline {
@@ -76,7 +72,7 @@ func generateStructFromFields(opt loader.Option) error {
 
 			for _, inlineFieldName := range inlineFields {
 				inlineField := inlineStructFields[inlineFieldName]
-				fieldName, err = generateFieldName(prefix+inlinePrefix, inlineFieldName)
+				fieldName, err = generateFieldNameWithPrefix(prefix+inlinePrefix, inlineFieldName)
 				if err != nil {
 					return err
 				}
@@ -94,6 +90,11 @@ func generateStructFromFields(opt loader.Option) error {
 		if field.Exported {
 			continue
 		}
+
+		if namecache[fieldName] {
+			return fmt.Errorf("duplicate field name %q", fieldName)
+		}
+
 		generateGetter(f, pkgPath, structName, fieldName, field)
 		namecache[fieldName] = true
 	}
@@ -112,7 +113,7 @@ func generateGetter(f *jen.File, pkgPath, structName, fieldName string, field lo
 	// }
 
 	v := newVisitor()
-	loader.Walk(v, field.Type)
+	_ = loader.Walk(v, field.Type)
 
 	shortName := loader.LowerFirst(structName)[:1]
 
@@ -133,7 +134,7 @@ func generateInlineGetter(f *jen.File, pkgPath, structName, inlineStructName, fi
 	// }
 
 	v := newVisitor()
-	loader.Walk(v, field.Type)
+	_ = loader.Walk(v, field.Type)
 
 	shortName := loader.LowerFirst(structName)[:1]
 
@@ -147,7 +148,7 @@ func generateInlineGetter(f *jen.File, pkgPath, structName, inlineStructName, fi
 		Line()
 }
 
-func generateFieldName(prefix, fieldName string) (string, error) {
+func generateFieldNameWithPrefix(prefix, fieldName string) (string, error) {
 	if prefix != "" {
 		p, _ := utf8.DecodeRuneInString(prefix)
 		if !unicode.IsUpper(p) {
