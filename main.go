@@ -34,9 +34,11 @@ func generateStructFromFields(opt loader.Option) error {
 
 	namecache := make(map[string]bool)
 
-	structVisitor := newStructVisitor()
-	_ = loader.Walk(structVisitor, structType)
-	fields := structVisitor.fields
+	fields, err := generateStructFields(structType)
+	if err != nil {
+		return err
+	}
+
 	fieldNames, err := generateSortedStructFields(fields)
 	if err != nil {
 		return err
@@ -51,17 +53,11 @@ func generateStructFromFields(opt loader.Option) error {
 		}
 
 		if field.Tag != nil && field.Tag.Inline {
-			inlineStructVisitor := newStructVisitor()
-			_ = loader.Walk(inlineStructVisitor, field.Type.Underlying())
-			if inlineStructVisitor.err != nil {
-				return err
+			inlineStructFields, err := generateStructFields(field.Type.Underlying())
+			if err != nil {
+				return fmt.Errorf("%w\nhint: remove field %q from struct %q", err, field.Name, structName)
 			}
 
-			if !inlineStructVisitor.isStruct {
-				return fmt.Errorf("inline field must be struct\nhint: remove field %q from struct %q", field.Name, structName)
-			}
-
-			inlineStructFields := inlineStructVisitor.fields
 			inlineFields, err := generateSortedStructFields(inlineStructFields)
 			if err != nil {
 				return err
@@ -112,15 +108,12 @@ func generateGetter(f *jen.File, pkgPath, structName, fieldName string, field lo
 	// 	return e.name
 	// }
 
-	v := newVisitor()
-	_ = loader.Walk(v, field.Type)
-
 	shortName := loader.LowerFirst(structName)[:1]
 
 	f.Func().
 		Params(Id(shortName).Id(structName)).        // (e YourStruct)
 		Id(loader.UpperCommonInitialism(fieldName)). // Name
-		Params().Add(v.code).                        // (YourReturnType)
+		Params().Add(generateType(field.Type)).      // (YourReturnType)
 		Block(
 			Return(Id(shortName).Dot(field.Name)),
 		).
@@ -133,15 +126,12 @@ func generateInlineGetter(f *jen.File, pkgPath, structName, inlineStructName, fi
 	// 	return e.inlineStruct.name
 	// }
 
-	v := newVisitor()
-	_ = loader.Walk(v, field.Type)
-
 	shortName := loader.LowerFirst(structName)[:1]
 
 	f.Func().
 		Params(Id(shortName).Id(structName)).        // (e YourStruct)
 		Id(loader.UpperCommonInitialism(fieldName)). // Name
-		Params().Add(v.code).                        // (YourReturnType)
+		Params().Add(generateType(field.Type)).      // (YourReturnType)
 		Block(
 			Return(Id(shortName).Dot(inlineStructName).Dot(field.Name)),
 		).
@@ -244,4 +234,22 @@ func (v *structVisitor) Visit(T types.Type) bool {
 	default:
 		return true
 	}
+}
+
+func generateStructFields(T types.Type) (map[string]loader.StructField, error) {
+	v := newStructVisitor()
+	_ = loader.Walk(v, T)
+	if !v.isStruct {
+		return nil, fmt.Errorf("%v is not a struct", T)
+	}
+	if v.err != nil {
+		return nil, v.err
+	}
+	return v.fields, nil
+}
+
+func generateType(T types.Type) *Statement {
+	v := newVisitor()
+	_ = loader.Walk(v, T)
+	return v.code
 }
