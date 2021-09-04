@@ -21,81 +21,36 @@ type StructField struct {
 	PkgName string `example:"test"`
 
 	Exported bool `example:"true"`
-	Tag      *Tag `example:"get:'Renamed'"` // To ignore getter.
-	*Type
+
+	// Stores the original position of the field in the struct.
 	Ordinal int
+
+	Tag  *Tag `example:"get:'Renamed'"` // To ignore getter.
+	Type types.Type
 }
 
-type Type struct {
-	Name         string `example:"NullString"`
-	PkgPath      string `example:"database/sql"`
-	IsPointer    bool
-	IsCollection bool // Whether it's an array or slice.
-	IsStruct     bool
-	IsMap        bool
-	MapKey       *Type
-	MapValue     *Type
-	T            types.Type
-	E            types.Type
+type Visitor interface {
+	Visit(T types.Type) bool
 }
 
-// NewType recursively checks for the field type.
-func NewType(orityp types.Type) *Type {
-	var isPointer, isCollection, isStruct, isMap bool
-	var fieldPkgPath, fieldType string
-	var mapKey, mapValue *Type
-	typ := orityp
-
-	switch t := typ.(type) {
-	case *types.Slice:
-		isCollection = true
-		typ = t.Elem()
-	case *types.Array:
-		isCollection = true
-		typ = t.Elem()
-	case *types.Map:
-		isMap = true
-		mapKey = NewType(t.Key())
-		mapValue = NewType(t.Elem())
+func Walk(visitor Visitor, T types.Type) bool {
+	if next := visitor.Visit(T); !next {
+		return next
 	}
 
-	// In case the slice or array is pointer, we take the elem again.
-	switch t := typ.(type) {
-	case *types.Pointer:
-		isPointer = true
-		typ = t.Elem()
-	}
-
-	switch t := typ.(type) {
-	case *types.Struct:
-		isStruct = true
+	switch t := T.Underlying().(type) {
 	case *types.Named:
-		obj := t.Obj()
-		fieldPkgPath = obj.Pkg().Path()
-		fieldType = obj.Name()
-
-		switch v := t.Underlying().(type) {
-		case *types.Struct:
-			isStruct = true
-			typ = v
-		default:
-			typ = v
-		}
+		return Walk(visitor, t.Underlying())
+	case *types.Pointer:
+		return Walk(visitor, t.Elem())
+	case *types.Array:
+		return Walk(visitor, t.Elem())
+	case *types.Slice:
+		return Walk(visitor, t.Elem())
+	case *types.Map:
+		return Walk(visitor, t.Elem())
 	default:
-		fieldType = t.String()
-	}
-
-	return &Type{
-		Name:         fieldType,
-		PkgPath:      fieldPkgPath,
-		IsCollection: isCollection,
-		IsPointer:    isPointer,
-		IsMap:        isMap,
-		IsStruct:     isStruct,
-		MapKey:       mapKey,
-		MapValue:     mapValue,
-		T:            orityp,
-		E:            typ,
+		return types.IdenticalIgnoreTags(T, T.Underlying())
 	}
 }
 
@@ -106,7 +61,7 @@ type Option struct {
 	PkgPath    string
 	Prefix     string
 	StructName string
-	Type       *Type
+	Type       types.Type
 }
 
 type Generator func(opt Option) error
@@ -130,21 +85,19 @@ func New(fn Generator) error {
 		out := FileNameFromTypeName(*inp, *outp, structName)
 		obj := pkg.Types.Scope().Lookup(structName)
 		if obj == nil {
-			return fmt.Errorf("loader: struct %s not found", structName)
+			return fmt.Errorf("struct %s not found", structName)
 		}
 
 		// Check if it is a declared typed.
 		if _, ok := obj.(*types.TypeName); !ok {
-			return fmt.Errorf("loader: %v is not a named type", obj)
+			return fmt.Errorf("%v is not a named type", obj)
 		}
 
 		// Check if the type is a struct.
-		structType, ok := obj.Type().Underlying().(*types.Struct)
+		_, ok := obj.Type().Underlying().(*types.Struct)
 		if !ok {
-			return fmt.Errorf("loader: %v is not a struct", obj)
+			return fmt.Errorf("%v is not a struct", obj)
 		}
-
-		t := NewType(structType)
 
 		if err := fn(Option{
 			PkgName:    pkgName,
@@ -153,7 +106,7 @@ func New(fn Generator) error {
 			Out:        out,
 			In:         in,
 			StructName: structName,
-			Type:       t,
+			Type:       obj.Type().Underlying(),
 		}); err != nil {
 			return err
 		}
@@ -175,6 +128,7 @@ func ExtractStructFields(structType *types.Struct) (map[string]StructField, erro
 			if tag.Skip {
 				continue
 			}
+
 			if tag.Name != "" {
 				name = tag.Name
 			}
@@ -184,7 +138,7 @@ func ExtractStructFields(structType *types.Struct) (map[string]StructField, erro
 			Name:     field.Name(),
 			PkgPath:  field.Pkg().Path(),
 			Exported: field.Exported(),
-			Type:     NewType(field.Type()),
+			Type:     field.Type(),
 			Tag:      tag,
 			Ordinal:  i,
 		}

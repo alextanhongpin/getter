@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"go/types"
-	"log"
 	"sort"
 	"unicode"
 	"unicode/utf8"
@@ -17,7 +16,7 @@ const Generator = "github.com/alextanhongpin/getter"
 
 func main() {
 	if err := loader.New(generateStructFromFields); err != nil {
-		log.Fatalln(err)
+		panic(err)
 	}
 }
 
@@ -35,18 +34,16 @@ func generateStructFromFields(opt loader.Option) error {
 
 	namecache := make(map[string]bool)
 
-	structFields, err := loader.ExtractStructFields((structType.E).(*types.Struct))
-	if err != nil {
-		return err
-	}
-
-	fieldNames, err := generateSortedStructFields(structFields, structType)
+	structVisitor := newStructVisitor()
+	_ = loader.Walk(structVisitor, structType)
+	fields := structVisitor.fields
+	fieldNames, err := generateSortedStructFields(fields)
 	if err != nil {
 		return err
 	}
 
 	for _, fieldName := range fieldNames {
-		field := structFields[fieldName]
+		field := fields[fieldName]
 
 		fieldName, err = generateFieldName(prefix, fieldName)
 		if err != nil {
@@ -54,24 +51,29 @@ func generateStructFromFields(opt loader.Option) error {
 		}
 
 		if namecache[fieldName] {
-			return fmt.Errorf("getter: duplicate field name %q", fieldName)
+			return fmt.Errorf("duplicate field name %q", fieldName)
 		}
 
 		if field.Tag != nil && field.Tag.Inline {
-			if !field.IsStruct {
-				return fmt.Errorf("getter: inline field must be struct")
+			inlineStructVisitor := newStructVisitor()
+			_ = loader.Walk(inlineStructVisitor, field.Type.Underlying())
+			if inlineStructVisitor.err != nil {
+				return err
 			}
 
-			inlineStructFields, err := loader.ExtractStructFields((field.E).(*types.Struct))
+			if !inlineStructVisitor.isStruct {
+				return fmt.Errorf("inline field must be struct\nhint: remove field %q from struct %q", field.Name, structName)
+			}
+
+			inlineStructFields := inlineStructVisitor.fields
+			inlineFields, err := generateSortedStructFields(inlineStructFields)
 			if err != nil {
 				return err
 			}
-			inlineFields, err := generateSortedStructFields(inlineStructFields, field.Type)
-			if err != nil {
-				return err
-			}
+
 			inlineStructName := field.Name
 			inlinePrefix := field.Tag.InlinePrefix
+
 			for _, inlineFieldName := range inlineFields {
 				inlineField := inlineStructFields[inlineFieldName]
 				fieldName, err = generateFieldName(prefix+inlinePrefix, inlineFieldName)
@@ -80,7 +82,7 @@ func generateStructFromFields(opt loader.Option) error {
 				}
 
 				if namecache[fieldName] {
-					return fmt.Errorf("getter: duplicate field name %q", fieldName)
+					return fmt.Errorf("duplicate field name %q", fieldName)
 				}
 				generateInlineGetter(f, pkgPath, structName, inlineStructName, fieldName, inlineField)
 				namecache[fieldName] = true
@@ -96,7 +98,11 @@ func generateStructFromFields(opt loader.Option) error {
 		namecache[fieldName] = true
 	}
 
-	return f.Save(out) // e.g. main_gen.go
+	if err := f.Save(out); err != nil { // e.g. main_gen.go
+		return err
+	}
+	fmt.Printf("success: generated %s\n", out)
+	return nil
 }
 
 func generateGetter(f *jen.File, pkgPath, structName, fieldName string, field loader.StructField) {
@@ -105,12 +111,15 @@ func generateGetter(f *jen.File, pkgPath, structName, fieldName string, field lo
 	// 	return e.name
 	// }
 
+	v := newVisitor()
+	loader.Walk(v, field.Type)
+
 	shortName := loader.LowerFirst(structName)[:1]
 
 	f.Func().
-		Params(Id(shortName).Id(structName)).            // (e YourStruct)
-		Id(loader.UpperCommonInitialism(fieldName)).     // Name
-		Params().Add(generateType(pkgPath, field.Type)). // (YourReturnType)
+		Params(Id(shortName).Id(structName)).        // (e YourStruct)
+		Id(loader.UpperCommonInitialism(fieldName)). // Name
+		Params().Add(v.code).                        // (YourReturnType)
 		Block(
 			Return(Id(shortName).Dot(field.Name)),
 		).
@@ -123,52 +132,26 @@ func generateInlineGetter(f *jen.File, pkgPath, structName, inlineStructName, fi
 	// 	return e.inlineStruct.name
 	// }
 
+	v := newVisitor()
+	loader.Walk(v, field.Type)
+
 	shortName := loader.LowerFirst(structName)[:1]
 
 	f.Func().
-		Params(Id(shortName).Id(structName)).            // (e YourStruct)
-		Id(loader.UpperCommonInitialism(fieldName)).     // Name
-		Params().Add(generateType(pkgPath, field.Type)). // (YourReturnType)
+		Params(Id(shortName).Id(structName)).        // (e YourStruct)
+		Id(loader.UpperCommonInitialism(fieldName)). // Name
+		Params().Add(v.code).                        // (YourReturnType)
 		Block(
 			Return(Id(shortName).Dot(inlineStructName).Dot(field.Name)),
 		).
 		Line()
 }
 
-// Generate the field and type for primitive, map or collection.
-func generateType(pkgPath string, field *loader.Type) Code {
-	param := Null()
-
-	if field.IsMap {
-		key, value := field.MapKey, field.MapValue
-		param = param.Map(generateType(pkgPath, key))
-		param = param.Add(generateType(pkgPath, value))
-		return param
-	}
-
-	if field.IsCollection {
-		param = param.Index()
-	}
-
-	if field.IsPointer {
-		param = param.Add(Op("*"))
-	}
-
-	// If PkgPath is empty, it will result in empty imports.
-	if field.PkgPath != "" {
-		param = param.Qual(field.PkgPath, field.Name)
-	} else {
-		param = param.Id(field.Name)
-	}
-
-	return param
-}
-
 func generateFieldName(prefix, fieldName string) (string, error) {
 	if prefix != "" {
 		p, _ := utf8.DecodeRuneInString(prefix)
 		if !unicode.IsUpper(p) {
-			return "", fmt.Errorf("getter: flag value '-prefix=%s' cannot be lowercase\nhint: rename %q to %q", prefix, prefix, loader.UpperCommonInitialism(prefix))
+			return "", fmt.Errorf("flag value '-prefix=%s' cannot be lowercase\nhint: rename %q to %q", prefix, prefix, loader.UpperCommonInitialism(prefix))
 		}
 		fieldName = prefix + loader.UpperCommonInitialism(fieldName)
 	}
@@ -176,7 +159,7 @@ func generateFieldName(prefix, fieldName string) (string, error) {
 	return fieldName, nil
 }
 
-func generateSortedStructFields(structFields map[string]loader.StructField, structType *loader.Type) ([]string, error) {
+func generateSortedStructFields(structFields map[string]loader.StructField) ([]string, error) {
 	type fieldPos struct {
 		name    string
 		ordinal int
@@ -200,4 +183,61 @@ func generateSortedStructFields(structFields map[string]loader.StructField, stru
 	}
 
 	return keys, nil
+}
+
+type visitor struct {
+	code *Statement
+}
+
+func newVisitor() *visitor {
+	return &visitor{
+		code: Null(),
+	}
+}
+
+func (v *visitor) Visit(T types.Type) bool {
+	switch u := T.(type) {
+	case *types.Pointer:
+		v.code = v.code.Op("*")
+	case *types.Map:
+		iv := newVisitor()
+		_ = loader.Walk(iv, u.Key())
+		v.code = v.code.Map(iv.code)
+	case *types.Array:
+		v.code = v.code.Index(Lit(u.Len()))
+	case *types.Named:
+		o := u.Obj()
+		p := o.Pkg()
+		v.code = v.code.Qual(p.Path(), o.Name())
+	case *types.Slice:
+		v.code = v.code.Index()
+	default:
+		v.code = v.code.Id(u.String())
+	}
+	return true
+}
+
+type structVisitor struct {
+	isStruct bool
+	fields   map[string]loader.StructField
+	err      error
+}
+
+func newStructVisitor() *structVisitor {
+	return &structVisitor{}
+}
+
+func (v *structVisitor) Visit(T types.Type) bool {
+	switch u := T.(type) {
+	case *types.Struct:
+		v.isStruct = true
+		var err error
+		v.fields, err = loader.ExtractStructFields(u)
+		v.err = err
+
+		// Break the walk once we found the struct.
+		return false
+	default:
+		return true
+	}
 }
