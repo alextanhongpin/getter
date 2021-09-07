@@ -36,7 +36,7 @@ func packageName(prefix, path string) string {
 
 func loadPackage(path string) *packages.Package {
 	cfg := &packages.Config{
-		Mode: packages.NeedName | packages.NeedTypes | packages.NeedImports,
+		Mode: packages.NeedName | packages.NeedSyntax | packages.NeedTypes | packages.NeedImports,
 	}
 	pkgs, err := packages.Load(cfg, path)
 	if err != nil {
