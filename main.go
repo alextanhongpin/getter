@@ -226,7 +226,7 @@ func (v *structVisitor) Visit(T types.Type) bool {
 	case *types.Struct:
 		v.isStruct = true
 		var err error
-		v.fields, err = loader.ExtractStructFields(u)
+		v.fields, err = loader.NewStructFields(u)
 		v.err = err
 
 		// Break the walk once we found the struct.
