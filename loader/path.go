@@ -35,7 +35,16 @@ func safeAddSuffixToFileName(path, suffix string) string {
 }
 
 func isFile(path string) bool {
-	return filepath.Ext(path) != ""
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return false
+	}
+
+	if ext != ".go" {
+		panic(fmt.Errorf("output %q is not a valid .go file", path))
+	}
+
+	return true
 }
 
 func safeAddFileName(path, fileName string) string {
