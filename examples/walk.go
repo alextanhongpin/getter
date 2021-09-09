@@ -1,6 +1,6 @@
 package examples
 
-//go:generate go run ../main.go -type TestWalk
+//go:generate go run ../main.go -type TestWalk,Nested
 type TestWalk struct {
 	name   string
 	age    int

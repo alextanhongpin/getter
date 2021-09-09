@@ -7,7 +7,7 @@ import (
 type FooType int64
 
 //go:generate go run ../main.go -type=Foo,Bar
-//go:generate go run ../main.go -type=Fizz -prefix=Get
+//go:generate go run ../main.go -type=Fizz -out=./fizz_gen.go -prefix=Get
 // Foo is an example struct.
 type Foo struct {
 	str           string `get:"String"`
