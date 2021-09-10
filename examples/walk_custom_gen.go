@@ -2,6 +2,10 @@
 
 package examples
 
+func (n Nested) Name() string {
+	return n.name
+}
+
 func (t TestWalk) Name() string {
 	return t.name
 }
@@ -28,8 +32,4 @@ func (t TestWalk) M3() *Nested {
 
 func (t TestWalk) M4() [int64(100)]map[*Nested][]*map[*string]*Nested {
 	return t.m4
-}
-
-func (n Nested) Name() string {
-	return n.name
 }

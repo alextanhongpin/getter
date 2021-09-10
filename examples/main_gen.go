@@ -4,6 +4,14 @@ package examples
 
 import "database/sql"
 
+func (b Bar) Foo() Foo {
+	return b.foo
+}
+
+func (b Bar) Version() int64 {
+	return b.version
+}
+
 func (f Foo) String() string {
 	return f.str
 }
@@ -118,12 +126,4 @@ func (f Foo) BuzzItName() string {
 
 func (f Foo) BuzzItAge() int64 {
 	return f.buzz.Age
-}
-
-func (b Bar) Foo() Foo {
-	return b.foo
-}
-
-func (b Bar) Version() int64 {
-	return b.version
 }
