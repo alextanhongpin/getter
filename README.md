@@ -1,4 +1,4 @@
-# reader
+# getter
 
 Generate getters for golang using tags.
 
@@ -22,6 +22,8 @@ $ getter \
 ```
 
 ## Using go generate
+
+When using go generate, the input path is inferred automatically. 
 
 ```go
 package main
