@@ -101,7 +101,10 @@ func (u User) AccountName() string {
 	return u.acc.name
 }
 ```
+	
+</details>
 
+<details>
 <summary>account_gen.go</summary>
 
 ```go
@@ -136,7 +139,7 @@ type User struct {
 	acc     Account `get:",inline,Account"`
 }
 
-//go:generate go run ../main.go -type Account
+//go:generate go run ../main.go -type Account -prefix Get
 type Account struct {
 	id   int64
 	name string
@@ -169,7 +172,10 @@ func (u User) GetAccountName() string {
 }
 ```
 
+</details>
 
+<details>
+	
 <summary>account_gen.go</summary>
 
 ```go
@@ -234,7 +240,11 @@ func (u User) GetAcc() Account {
 	return u.acc
 }
 ```
+	
+</details>
 
+<details>
+	
 <summary>Inline</summary>
 
 ```go
