@@ -2,6 +2,11 @@
 
 Generate getters for golang using tags.
 
+Similar project: 
+- [mapper](https://github.com/alextanhongpin/mapper): convert struct to struct and more
+- [builder](https://github.com/alextanhongpin/builder): generate builder for private fields
+
+
 By default, getters for all private fields will be generated. To ignore, add `get:"-"` tag.
 
 
